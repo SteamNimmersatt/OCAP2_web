@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"github.com/OCAP2/web/server"
 	"github.com/labstack/echo/v4"
@@ -39,6 +40,11 @@ func app() error {
 	}
 
 	e := echo.New()
+
+	// Configure server timeouts for large file transfers
+	e.Server.ReadTimeout = 0 // No read timeout for large files
+	e.Server.WriteTimeout = 0 // No write timeout for large files
+	e.Server.IdleTimeout = 10 * time.Minute
 
 	loggerConfig := middleware.DefaultLoggerConfig
 	if setting.Logger {

@@ -226,10 +226,15 @@ func (h *Handler) GetCapture(c echo.Context) error {
 
 	upath := filepath.Join(h.setting.Data, filepath.Base(name+".gz"))
 
+	// Set appropriate headers for large file transfer
 	c.Response().Header().Set("Content-Encoding", "gzip")
 	c.Response().Header().Set("Content-Type", "application/json")
+	c.Response().Header().Set("Transfer-Encoding", "chunked")
+	c.Response().Header().Set("Connection", "keep-alive")
+	c.Response().Header().Set("Cache-Control", "no-cache")
 
-	return c.File(upath)
+	// Use streaming instead of loading entire file into memory
+	return h.streamFile(c, upath)
 }
 
 func (h *Handler) GetCaptureFile(c echo.Context) error {
@@ -319,6 +324,28 @@ func (h *Handler) GetAmmo(c echo.Context) error {
 	}
 
 	return c.File(upath)
+}
+
+func (h *Handler) streamFile(c echo.Context, filepath string) error {
+	// Open the file
+	file, err := os.Open(filepath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Get file info for Content-Length header
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
+	// Set Content-Length header
+	c.Response().Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
+
+	// Stream the file
+	_, err = io.Copy(c.Response(), file)
+	return err
 }
 
 func paramPath(c echo.Context, param string) (string, error) {
