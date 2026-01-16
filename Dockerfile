@@ -1,12 +1,13 @@
-FROM golang:1.20-alpine as builder
+FROM golang:1.20 as builder
 WORKDIR /go/pkg/ocap
 COPY . .
 ARG build_commit
-RUN apk add --no-cache alpine-sdk && go build -ldflags "-X github.com/OCAP2/web/server.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X github.com/OCAP2/web/server.BuildCommit=$build_commit" -a -o app ./cmd
+RUN go build -ldflags "-X github.com/OCAP2/web/server.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X github.com/OCAP2/web/server.BuildCommit=$build_commit" -a -o app ./cmd
 
-FROM alpine:3.14
+FROM debian:bookworm-slim
 WORKDIR /usr/local/ocap
-RUN mkdir -p /etc/ocap /usr/local/ocap/data /var/lib/ocap/db /var/lib/ocap/maps /var/lib/ocap/data && \
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /etc/ocap /usr/local/ocap/data /var/lib/ocap/db /var/lib/ocap/maps /var/lib/ocap/data && \
     echo '{}' > /etc/ocap/setting.json
 
 ENV OCAP_MARKERS /usr/local/ocap/markers
