@@ -42,10 +42,10 @@ func app() error {
 	e := echo.New()
 
 	// Configure server timeouts for large file transfers
+	// Increased idle timeout to support full-length replay viewing
 	e.Server.ReadTimeout = 0 // No read timeout for large files
 	e.Server.WriteTimeout = 0 // No write timeout for large files
-	e.Server.IdleTimeout = 10 * time.Minute
-
+	e.Server.IdleTimeout = 60 * time.Minute
 	loggerConfig := middleware.DefaultLoggerConfig
 	if setting.Logger {
 		flog, err := os.OpenFile("ocap.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
