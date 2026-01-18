@@ -226,13 +226,24 @@ func (h *Handler) GetCapture(c echo.Context) error {
 
 	upath := filepath.Join(h.setting.Data, filepath.Base(name+".gz"))
 
-	// Set appropriate headers for large file transfer
-	c.Response().Header().Set("Content-Encoding", "gzip")
-	c.Response().Header().Set("Content-Type", "application/json")
-	c.Response().Header().Set("Transfer-Encoding", "chunked")
-	c.Response().Header().Set("Connection", "keep-alive")
-	c.Response().Header().Set("Cache-Control", "no-cache")
+	// Check if file exists
+	fileInfo, statErr := os.Stat(upath)
+	if statErr != nil {
+		return statErr
+	}
 
+	// Set appropriate headers for large file transfer with better browser compatibility
+	c.Response().Header().Set("Content-Type", "application/json")
+	c.Response().Header().Set("Content-Encoding", "gzip")
+	c.Response().Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
+	c.Response().Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Response().Header().Set("Pragma", "no-cache")
+	c.Response().Header().Set("Expires", "0")
+	c.Response().Header().Set("Connection", "keep-alive")
+	
+	// Remove Transfer-Encoding header to let Go handle it automatically
+	// This can help with browser compatibility issues
+	
 	// Use streaming instead of loading entire file into memory
 	return h.streamFile(c, upath)
 }
@@ -343,9 +354,27 @@ func (h *Handler) streamFile(c echo.Context, filepath string) error {
 	// Set Content-Length header
 	c.Response().Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
 
-	// Stream the file
-	_, err = io.Copy(c.Response(), file)
-	return err
+	// Stream the file with better buffer control for browser compatibility
+	buffer := make([]byte, 32*1024) // 32KB buffer
+	for {
+		n, err := file.Read(buffer)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if n == 0 {
+			break
+		}
+		
+		// Write to response
+		if _, writeErr := c.Response().Write(buffer[:n]); writeErr != nil {
+			return writeErr
+		}
+		
+		// Flush the response to ensure data is sent immediately
+		c.Response().Flush()
+	}
+	
+	return nil
 }
 
 func paramPath(c echo.Context, param string) (string, error) {
